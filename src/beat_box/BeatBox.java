@@ -60,7 +60,7 @@ public class BeatBox {
 		buttonBox.add(serializeIt);
 		
 		JButton restoreIt = new JButton("Restore it");
-		restoreIt.addActionListener(new MyReadListener());
+		restoreIt.addActionListener(new MyReadInListener());
 		buttonBox.add(restoreIt);
 		
 		Box nameBox = new Box(BoxLayout.Y_AXIS);
@@ -80,7 +80,7 @@ public class BeatBox {
 		background.add(BorderLayout.CENTER, mainPanel);
 		
 		for(int i = 0; i < 256; i++) {
-			JCheckBox c = new JCheckbox();
+			JCheckBox c = new JCheckBox();
 			c.setSelected(false);
 			checkboxList.add(c);
 			mainPanel.add(c);
@@ -107,6 +107,128 @@ public class BeatBox {
 		int[] trackList = null;
 		sequence.deleteTrack(track);
 		track = sequence.createTrack();
+		
+		for(int i = 0; i<16; i++) {
+			trackList = new int[16];
+			
+			int key = instruments[i];
+			
+			for (int j = 0; j<16; j++) {
+				JCheckBox jc = checkboxList.get(j + 16 *i);
+				if (jc.isSelected()) {
+					trackList[j] = key;
+				} else {
+					trackList[j] = 0;
+				}
+			}
+			makesTracks(trackList);
+			track.add(makeEvent(176, 1, 127, 0, 16));
+		}
+		track.add(makeEvent(192, 9, 1, 0, 15));
+		try {
+			sequencer.setSequence(sequence);
+			sequencer.setLoopCount(sequencer.LOOP_CONTINUOUSLY);
+			sequencer.start();
+			sequencer.setTempoInBPM(120);
+		} catch (Exception e) {e.printStackTrace();
+		}
+	}
+	
+	public class MyStartListener implements ActionListener {
+		public void actionPerformed(ActionEvent a) {
+			buildTrackAndStart();
+		}
+	}
+	
+	public class MyStopListener implements ActionListener{
+		public void actionPerformed(ActionEvent a) {
+			sequencer.stop();
+		}
+	}
+	
+	public class MyUpTempoListener implements ActionListener{
+		public void actionPerformed(ActionEvent a) {
+			float tempoFactor = sequencer.getTempoFactor();
+			sequencer.setTempoFactor((float)(tempoFactor * 1.03));
+		}
+	}
+	
+	public class MyDownTempoListener implements ActionListener{
+		public void actionPerformed(ActionEvent a) {
+			float tempoFactor = sequencer.getTempoFactor();
+			sequencer.setTempoFactor((float)(tempoFactor * .97));
+		}
+	}
+	
+	public void makesTracks(int[] list) {
+		for (int i = 0; i <16; i++) {
+			int key = list[i];
+			if (key != 0) {
+				track.add(makeEvent(144, 9, key, 100, i));
+				track.add(makeEvent(128, 9, key, 100, i+1));
+			}
+		}
+	}
+	
+	public MidiEvent makeEvent(int comd, int chan, int one, int two, int tick) {
+		MidiEvent event = null;
+		try {
+			ShortMessage a = new ShortMessage();
+			a.setMessage(comd, chan, one, two);
+			event = new MidiEvent(a, tick);
+		} catch (Exception e) {e.printStackTrace();}
+		return event;
+	}
+	
+	public class MySendListener implements ActionListener{
+		public void actionPerformed(ActionEvent a) {
+			boolean[] checkboxState = new boolean[256];
+			
+			for (int i = 0; i < 256; i++) {
+				JCheckBox check = (JCheckBox) checkboxList.get(i);
+				if (check.isSelected()) {
+					checkboxState[i] = true;
+				}
+			}
+			
+			try {
+				FileOutputStream fileStream = new FileOutputStream(new File("checkbox.ser"));
+				ObjectOutputStream os = new ObjectOutputStream(fileStream);
+				os.writeObject(checkboxState);
+			} catch (Exception ex) {
+				ex.printStackTrace();
+			}
+		}
+	}
+	
+	public class MyReadInListener implements ActionListener{
+		public void actionPerformed (ActionEvent a) {
+			boolean[] checkboxState = null;
+			
+			try {
+				FileInputStream fileIn = new FileInputStream(new File("ceckbox.ser"));
+				ObjectInputStream is = new ObjectInputStream(fileIn);
+				checkboxState = (boolean[]) is.readObject();
+			} catch (Exception ex) {
+				ex.printStackTrace();
+			}
+			
+			for (int i = 0; i < 256; i++) {
+				JCheckBox check = (JCheckBox) checkboxList.get(i);
+				if (checkboxState[i]) {
+					check.setSelected(true);
+				} else {
+					check.setSelected(false);
+				}
+			}
+			
+			sequencer.stop();
+			buildTrackAndStart();
+		}
+	}
+	
+	public static void main(String[] args) {
+		new BeatBox().buildGui();
 	}
 }
 
